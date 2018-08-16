@@ -183,6 +183,11 @@ MP_NOINLINE STATIC bool init_flash_fs(uint reset_mode) {
         // populate the filesystem with factory files
         factory_reset_make_files(&vfs_fat->fatfs);
 
+        // unpack a tarball for any extra files
+#if MICROPY_FLASH_TARBALL
+        pyb_flash_untar_vfs(vfs_fat);
+#endif
+
         // keep LED on for at least 200ms
         systick_wait_at_least(start_tick, 200);
         led_state(PYB_LED_GREEN, 0);
