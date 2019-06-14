@@ -191,3 +191,11 @@ $(BUILD)/$(BTREE_DIR)/%.o: CFLAGS += -Wno-old-style-definition -Wno-sign-compare
 $(BUILD)/extmod/modbtree.o: CFLAGS += $(BTREE_DEFS)
 endif
 
+################################################################################
+# DCFurs
+
+ifeq ($(MICROPY_PY_DCFURS),1)
+CFLAGS_MOD += -DMICROPY_PY_DCFURS=1
+SRC_MOD += extmod/dcfurs/module.c
+SRC_MOD += extmod/dcfurs/matrix.c
+endif
