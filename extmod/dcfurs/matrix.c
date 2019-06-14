@@ -259,5 +259,25 @@ mp_obj_t dcfurs_has_pixel(mp_obj_t xobj, mp_obj_t yobj)
 
 mp_obj_t dcfurs_clear(void)
 {
+    int i;
+
+    for (i = 0; i < (DCF_DIMMING_STEPS * DCF_TOTAL_ROWS); i++) {
+        /* Clear pixeks in bank B */
+        dcf_fb.pxdataB.red[i] |= DCF_PIN_COL_BANKB << 16;
+        dcf_fb.pxdataB.red[i] &= ~DCF_PIN_COL_BANKB;
+        dcf_fb.pxdataB.green[i] |= DCF_PIN_COL_BANKB << 16;
+        dcf_fb.pxdataB.green[i] &= ~DCF_PIN_COL_BANKB;
+        dcf_fb.pxdataB.blue[i] |= DCF_PIN_COL_BANKB << 16;
+        dcf_fb.pxdataB.blue[i] &= ~DCF_PIN_COL_BANKB;
+
+        /* Clear pixels in bank C */
+        dcf_fb.pxdataC.red[i] |= DCF_PIN_COL_BANKC << 16;
+        dcf_fb.pxdataC.red[i] &= ~DCF_PIN_COL_BANKC;
+        dcf_fb.pxdataC.green[i] |= DCF_PIN_COL_BANKC << 16;
+        dcf_fb.pxdataC.green[i] &= ~DCF_PIN_COL_BANKC;
+        dcf_fb.pxdataC.blue[i] |= DCF_PIN_COL_BANKC << 16;
+        dcf_fb.pxdataC.blue[i] &= ~DCF_PIN_COL_BANKC;
+    }
+    
     return mp_const_none;
 }
