@@ -60,12 +60,12 @@ mp_obj_t dcfurs_loop(size_t n_args, const mp_obj_t *args)
     if (dcf_fb.count >= (DCF_SETUP_STEPS + (DCF_TOTAL_ROWS * DCF_DIMMING_STEPS * 3))) {
         dcf_fb.count = 0;
     }
+    int idx = dcf_fb.count++;
     /* Do the next step of the program. */
-    GPIOB->BSRR = dcf_fb.pxdataB.setup[dcf_fb.count];
-    GPIOC->BSRR = dcf_fb.pxdataC.setup[dcf_fb.count];
-    dcf_fb.count++;
+    GPIOB->BSRR = dcf_fb.pxdataB.setup[idx];
+    GPIOC->BSRR = dcf_fb.pxdataC.setup[idx];
 
-    return mp_const_none;
+    return MP_OBJ_NEW_SMALL_INT(dcf_fb.pxdataB.setup[idx]);
 }
 
 /* Drive all column banks in parallel. */
@@ -154,14 +154,40 @@ static void dcfurs_setpix(int row, int col, int pix)
         /* COL3-12 are mapped onto port C instead. */
         prog = &dcf_fb.pxdataC;
     }
+    /* Compensate for blue having fewer bits */
+    if (b) b++;
 
     for (i = 0; i < DCF_DIMMING_STEPS; i++) {
+#if 0
         DCF_BITBAND_SRAM(&prog->red[row * DCF_DIMMING_STEPS + i], bit) = (r > i);
         DCF_BITBAND_SRAM(&prog->red[row * DCF_DIMMING_STEPS + i], bit + 16) = (r <= i);
         DCF_BITBAND_SRAM(&prog->green[row * DCF_DIMMING_STEPS + i], bit) = (g > i);
         DCF_BITBAND_SRAM(&prog->green[row * DCF_DIMMING_STEPS + i], bit + 16) = (g <= i);
         DCF_BITBAND_SRAM(&prog->blue[row * DCF_DIMMING_STEPS + i], bit) = (b > i);
         DCF_BITBAND_SRAM(&prog->blue[row * DCF_DIMMING_STEPS + i], bit + 16) = (b <= i);
+#else
+        if (r > i) {
+            prog->red[row * DCF_DIMMING_STEPS + i] |= (1 << bit);
+            prog->red[row * DCF_DIMMING_STEPS + i] &= ~(0x10000 << bit);
+        } else {
+            prog->red[row * DCF_DIMMING_STEPS + i] &= ~(1 << bit);
+            prog->red[row * DCF_DIMMING_STEPS + i] |= (0x10000 << bit);
+        }
+        if (g > i) {
+            prog->green[row * DCF_DIMMING_STEPS + i] |= (1 << bit);
+            prog->green[row * DCF_DIMMING_STEPS + i] &= ~(0x10000 << bit);
+        } else {
+            prog->green[row * DCF_DIMMING_STEPS + i] &= ~(1 << bit);
+            prog->green[row * DCF_DIMMING_STEPS + i] |= (0x10000 << bit);
+        }
+        if (b > i) {
+            prog->blue[row * DCF_DIMMING_STEPS + i] |= (1 << bit);
+            prog->blue[row * DCF_DIMMING_STEPS + i] &= ~(0x10000 << bit);
+        } else {
+            prog->blue[row * DCF_DIMMING_STEPS + i] &= ~(1 << bit);
+            prog->blue[row * DCF_DIMMING_STEPS + i] |= (0x10000 << bit);
+        }
+#endif
     }
 }
 
