@@ -6,9 +6,7 @@
 #include "dcfurs.h"
 
 /* LED Matrix operations */
-STATIC MP_DEFINE_CONST_FUN_OBJ_0(dcfurs_init_obj, dcfurs_init);
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR(dcfurs_loop_obj, 0, dcfurs_loop);
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(dcfurs_columns_obj, dcfurs_columns);
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(dcfurs_init_obj, dcfurs_init);
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(dcfurs_set_pixel_obj, dcfurs_set_pixel);
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(dcfurs_set_row_obj, dcfurs_set_row);
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(dcfurs_set_frame_obj, dcfurs_set_frame);
@@ -20,8 +18,6 @@ STATIC const mp_rom_map_elem_t mp_module_dcfurs_globals_table[] = {
 
     /* LED Matrix API */
     { MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&dcfurs_init_obj) },
-    { MP_ROM_QSTR(MP_QSTR_loop), MP_ROM_PTR(&dcfurs_loop_obj) },
-    { MP_ROM_QSTR(MP_QSTR_columns), MP_ROM_PTR(&dcfurs_columns_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_pixel), MP_ROM_PTR(&dcfurs_set_pixel_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_row), MP_ROM_PTR(&dcfurs_set_row_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_frame), MP_ROM_PTR(&dcfurs_set_frame_obj) },

@@ -29,8 +29,6 @@ struct dcf_pwm_program {
 };
 
 struct dcf_framebuf {
-    int count;
-
     /* Pixel data buffers. */
     struct dcf_pwm_program pxdataB;
     struct dcf_pwm_program pxdataC;
@@ -40,52 +38,31 @@ struct dcf_framebuf {
     DMA_HandleTypeDef dma_gpioC;
 };
 
-static struct dcf_framebuf dcf_fb = {0};
+static struct dcf_framebuf dcf_fb;
 
-/* DMA Descriptors for blitting row data directly to the GPIO registers. */
 static const DMA_InitTypeDef dma_init_blit_gpio = {
-    .Request             = DMA_REQUEST_6,
+    .Request             = DMA_REQUEST_7,
     .Direction           = DMA_MEMORY_TO_PERIPH,
     .PeriphInc           = DMA_PINC_DISABLE,
     .MemInc              = DMA_MINC_ENABLE,
-    .PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD,
-    .MemDataAlignment    = DMA_MDATAALIGN_HALFWORD,
-    .Mode                = DMA_NORMAL,
-    .Priority            = DMA_PRIORITY_HIGH
+    .PeriphDataAlignment = DMA_PDATAALIGN_WORD,
+    .MemDataAlignment    = DMA_MDATAALIGN_WORD,
+    .Mode                = DMA_CIRCULAR,
+    .Priority            = DMA_PRIORITY_HIGH,
 };
 
-/* Callback function to drive the matrix display. */
-mp_obj_t dcfurs_loop(size_t n_args, const mp_obj_t *args)
+mp_obj_t dcfurs_init(mp_obj_t timer)
 {
-    const int pwmsteps = DCF_PWM_RED_STEPS + DCF_PWM_GREEN_STEPS + DCF_PWM_BLUE_STEPS;
-    if (dcf_fb.count >= (DCF_SETUP_STEPS + (pwmsteps * DCF_TOTAL_ROWS))) {
-        dcf_fb.count = 0;
-    }
-    int idx = dcf_fb.count++;
-    /* Do the next step of the program. */
-    GPIOB->BSRR = dcf_fb.pxdataB.setup[idx];
-    GPIOC->BSRR = dcf_fb.pxdataC.setup[idx];
-
-    return MP_OBJ_NEW_SMALL_INT(dcf_fb.pxdataB.setup[idx]);
-}
-
-/* Drive all column banks in parallel. */
-mp_obj_t dcfurs_columns(mp_obj_t obj)
-{
-    int x = mp_obj_get_int(obj);
-    int y = (x & 0x7) | ((x & 0x3e000) >> 8);
-    uint32_t bankB = (y & DCF_PIN_COL_BANKB) | ((~y & DCF_PIN_COL_BANKC) << 16);
-    uint32_t bankC = (x & DCF_PIN_COL_BANKC) | ((~x & DCF_PIN_COL_BANKC) << 16);
-    GPIOB->BSRR = bankB;
-    GPIOC->BSRR = bankC;
-
-    return mp_const_none;
-}
-
-mp_obj_t dcfurs_init(void)
-{
+    TIM_HandleTypeDef *htim = pyb_timer_get_handle(timer);
     GPIO_InitTypeDef gpio;
     int i;
+
+    mp_obj_t timer_channel_args[5] = {
+        0,  /* Function object */
+        0,  /* Timer object */
+        0,  /* Timer channel number */
+        MP_ROM_QSTR(MP_QSTR_mode), mp_load_attr(timer, MP_QSTR_OC_TIMING)
+    };
 
     /* Prepare row and column driver outputs (group B) */
     gpio.Speed = GPIO_SPEED_FAST;
@@ -114,7 +91,6 @@ mp_obj_t dcfurs_init(void)
     dcf_fb.pxdataB.setup[2] = (DCF_PIN_ALL_BANKB << 16); /* First Falling CLK */
 
     /* A rising edge shifts the pulse to the next row at each step. */
-    /* TODO: This will get more complex to add color. */
     for (i = 0; i < DCF_TOTAL_ROWS; i++) {
         dcf_fb.pxdataC.red[(i * DCF_PWM_RED_STEPS) + 0] = DCF_PIN_COL_BANKC << 16;
         dcf_fb.pxdataB.red[(i * DCF_PWM_RED_STEPS) + 0] = DCF_PIN_CLK | (DCF_PIN_COL_BANKB << 16);
@@ -131,6 +107,35 @@ mp_obj_t dcfurs_init(void)
     dcf_fb.pxdataB.red[(DCF_TOTAL_ROWS - 1) * DCF_PWM_RED_STEPS + 1] |= (DCF_PIN_GREEN << 16);
     dcf_fb.pxdataB.green[(DCF_TOTAL_ROWS - 1) * DCF_PWM_GREEN_STEPS - 1] |= DCF_PIN_BLUE;
     dcf_fb.pxdataB.green[(DCF_TOTAL_ROWS - 1) * DCF_PWM_GREEN_STEPS + 1] |= (DCF_PIN_BLUE << 16);
+
+    /* Initialize the DMA channels  */
+    /* TODO: Sanity-check that the caller gave us the right timer (TIM8)? */
+    __HAL_RCC_DMA2_CLK_ENABLE();
+
+    dcf_fb.dma_gpioB.Instance = DMA2_Channel6;
+    memcpy(&dcf_fb.dma_gpioB.Init, &dma_init_blit_gpio, sizeof(DMA_InitTypeDef));
+    HAL_DMA_DeInit(&dcf_fb.dma_gpioB);
+    HAL_DMA_Init(&dcf_fb.dma_gpioB);
+
+    dcf_fb.dma_gpioC.Instance = DMA2_Channel7;
+    memcpy(&dcf_fb.dma_gpioC.Init, &dma_init_blit_gpio, sizeof(DMA_InitTypeDef));
+    HAL_DMA_DeInit(&dcf_fb.dma_gpioC);
+    HAL_DMA_Init(&dcf_fb.dma_gpioC);
+
+    /* Configure the timer channels. */
+    timer_channel_args[2] = MP_OBJ_NEW_SMALL_INT(1);
+    mp_load_method(timer, MP_QSTR_channel, timer_channel_args);
+    mp_call_method_n_kw(1, 1, timer_channel_args);
+
+    timer_channel_args[2] = MP_OBJ_NEW_SMALL_INT(2);
+    mp_load_method(timer, MP_QSTR_channel, timer_channel_args);
+    mp_call_method_n_kw(1, 1, timer_channel_args);
+
+    /* Start the DMA */
+    htim->Instance->DIER &= ~(TIM_DMA_CC1 | TIM_DMA_CC2);
+    HAL_DMA_Start(&dcf_fb.dma_gpioB, (uint32_t)&dcf_fb.pxdataB, (uint32_t)&GPIOB->BSRR, DCF_TOTAL_STEPS);
+    HAL_DMA_Start(&dcf_fb.dma_gpioC, (uint32_t)&dcf_fb.pxdataC, (uint32_t)&GPIOC->BSRR, DCF_TOTAL_STEPS);
+    htim->Instance->DIER |= (TIM_DMA_CC1 | TIM_DMA_CC2);
 
     /* Enable the matrix driver output. */
     GPIOC->BSRR = DCF_PIN_ROW_ENABLE << 16;
