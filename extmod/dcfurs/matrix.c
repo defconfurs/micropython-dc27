@@ -23,9 +23,9 @@
 /* PWM Program data, per GPIO bank. */
 struct dcf_pwm_program {
     uint32_t setup[DCF_SETUP_STEPS];
-    uint32_t red[DCF_TOTAL_ROWS * DCF_DIMMING_STEPS];
-    uint32_t green[DCF_TOTAL_ROWS * DCF_DIMMING_STEPS];
-    uint32_t blue[DCF_TOTAL_ROWS * DCF_DIMMING_STEPS];
+    uint32_t red[DCF_TOTAL_ROWS * DCF_PWM_RED_STEPS];
+    uint32_t green[DCF_TOTAL_ROWS * DCF_PWM_GREEN_STEPS];
+    uint32_t blue[DCF_TOTAL_ROWS * DCF_PWM_BLUE_STEPS];
 };
 
 struct dcf_framebuf {
@@ -57,7 +57,8 @@ static const DMA_InitTypeDef dma_init_blit_gpio = {
 /* Callback function to drive the matrix display. */
 mp_obj_t dcfurs_loop(size_t n_args, const mp_obj_t *args)
 {
-    if (dcf_fb.count >= (DCF_SETUP_STEPS + (DCF_TOTAL_ROWS * DCF_DIMMING_STEPS * 3))) {
+    const int pwmsteps = DCF_PWM_RED_STEPS + DCF_PWM_GREEN_STEPS + DCF_PWM_BLUE_STEPS;
+    if (dcf_fb.count >= (DCF_SETUP_STEPS + (pwmsteps * DCF_TOTAL_ROWS))) {
         dcf_fb.count = 0;
     }
     int idx = dcf_fb.count++;
@@ -115,21 +116,21 @@ mp_obj_t dcfurs_init(void)
     /* A rising edge shifts the pulse to the next row at each step. */
     /* TODO: This will get more complex to add color. */
     for (i = 0; i < DCF_TOTAL_ROWS; i++) {
-        dcf_fb.pxdataC.red[(i * DCF_DIMMING_STEPS) + 0] = DCF_PIN_COL_BANKC << 16;
-        dcf_fb.pxdataB.red[(i * DCF_DIMMING_STEPS) + 0] = DCF_PIN_CLK | (DCF_PIN_COL_BANKB << 16);
-        dcf_fb.pxdataB.red[(i * DCF_DIMMING_STEPS) + 1] = (DCF_PIN_CLK << 16);
-        dcf_fb.pxdataC.green[(i * DCF_DIMMING_STEPS) + 0] = DCF_PIN_COL_BANKC << 16;
-        dcf_fb.pxdataB.green[(i * DCF_DIMMING_STEPS) + 0] = DCF_PIN_CLK | (DCF_PIN_COL_BANKB << 16);
-        dcf_fb.pxdataB.green[(i * DCF_DIMMING_STEPS) + 1] |= (DCF_PIN_CLK << 16);
-        dcf_fb.pxdataC.blue[(i * DCF_DIMMING_STEPS) + 0] = DCF_PIN_COL_BANKC << 16;
-        dcf_fb.pxdataB.blue[(i * DCF_DIMMING_STEPS) + 0] |= DCF_PIN_CLK | (DCF_PIN_COL_BANKB << 16);
-        dcf_fb.pxdataB.blue[(i * DCF_DIMMING_STEPS) + 1] |= (DCF_PIN_CLK << 16);
+        dcf_fb.pxdataC.red[(i * DCF_PWM_RED_STEPS) + 0] = DCF_PIN_COL_BANKC << 16;
+        dcf_fb.pxdataB.red[(i * DCF_PWM_RED_STEPS) + 0] = DCF_PIN_CLK | (DCF_PIN_COL_BANKB << 16);
+        dcf_fb.pxdataB.red[(i * DCF_PWM_RED_STEPS) + 1] = (DCF_PIN_CLK << 16);
+        dcf_fb.pxdataC.green[(i * DCF_PWM_GREEN_STEPS) + 0] = DCF_PIN_COL_BANKC << 16;
+        dcf_fb.pxdataB.green[(i * DCF_PWM_GREEN_STEPS) + 0] = DCF_PIN_CLK | (DCF_PIN_COL_BANKB << 16);
+        dcf_fb.pxdataB.green[(i * DCF_PWM_GREEN_STEPS) + 1] |= (DCF_PIN_CLK << 16);
+        dcf_fb.pxdataC.blue[(i * DCF_PWM_BLUE_STEPS) + 0] = DCF_PIN_COL_BANKC << 16;
+        dcf_fb.pxdataB.blue[(i * DCF_PWM_BLUE_STEPS) + 0] |= DCF_PIN_CLK | (DCF_PIN_COL_BANKB << 16);
+        dcf_fb.pxdataB.blue[(i * DCF_PWM_BLUE_STEPS) + 1] |= (DCF_PIN_CLK << 16);
     }
     /* The last clock for the R and G channels should setup a pulse for the next color plane. */
-    dcf_fb.pxdataB.red[(DCF_TOTAL_ROWS - 1) * DCF_DIMMING_STEPS - 1] |= DCF_PIN_GREEN;
-    dcf_fb.pxdataB.red[(DCF_TOTAL_ROWS - 1) * DCF_DIMMING_STEPS + 1] |= (DCF_PIN_GREEN << 16);
-    dcf_fb.pxdataB.green[(DCF_TOTAL_ROWS - 1) * DCF_DIMMING_STEPS - 1] |= DCF_PIN_BLUE;
-    dcf_fb.pxdataB.green[(DCF_TOTAL_ROWS - 1) * DCF_DIMMING_STEPS + 1] |= (DCF_PIN_BLUE << 16);
+    dcf_fb.pxdataB.red[(DCF_TOTAL_ROWS - 1) * DCF_PWM_RED_STEPS - 1] |= DCF_PIN_GREEN;
+    dcf_fb.pxdataB.red[(DCF_TOTAL_ROWS - 1) * DCF_PWM_RED_STEPS + 1] |= (DCF_PIN_GREEN << 16);
+    dcf_fb.pxdataB.green[(DCF_TOTAL_ROWS - 1) * DCF_PWM_GREEN_STEPS - 1] |= DCF_PIN_BLUE;
+    dcf_fb.pxdataB.green[(DCF_TOTAL_ROWS - 1) * DCF_PWM_GREEN_STEPS + 1] |= (DCF_PIN_BLUE << 16);
 
     /* Enable the matrix driver output. */
     GPIOC->BSRR = DCF_PIN_ROW_ENABLE << 16;
@@ -143,7 +144,7 @@ static void dcfurs_setpix(int row, int col, int pix)
     int bit = col;
     int r = (pix & 0xE0) >> 5;
     int g = (pix & 0x1C) >> 2;
-    int b = (pix & 0x03) << 1;
+    int b = (pix & 0x03) * 3;
     int i;
 
     /* Some bit fiddling... */
@@ -154,40 +155,38 @@ static void dcfurs_setpix(int row, int col, int pix)
         /* COL3-12 are mapped onto port C instead. */
         prog = &dcf_fb.pxdataC;
     }
-    /* Compensate for blue having fewer bits */
-    if (b) b++;
 
-    for (i = 0; i < DCF_DIMMING_STEPS; i++) {
-#if 0
-        DCF_BITBAND_SRAM(&prog->red[row * DCF_DIMMING_STEPS + i], bit) = (r > i);
-        DCF_BITBAND_SRAM(&prog->red[row * DCF_DIMMING_STEPS + i], bit + 16) = (r <= i);
-        DCF_BITBAND_SRAM(&prog->green[row * DCF_DIMMING_STEPS + i], bit) = (g > i);
-        DCF_BITBAND_SRAM(&prog->green[row * DCF_DIMMING_STEPS + i], bit + 16) = (g <= i);
-        DCF_BITBAND_SRAM(&prog->blue[row * DCF_DIMMING_STEPS + i], bit) = (b > i);
-        DCF_BITBAND_SRAM(&prog->blue[row * DCF_DIMMING_STEPS + i], bit + 16) = (b <= i);
-#else
-        if (r > i) {
-            prog->red[row * DCF_DIMMING_STEPS + i] |= (1 << bit);
-            prog->red[row * DCF_DIMMING_STEPS + i] &= ~(0x10000 << bit);
-        } else {
-            prog->red[row * DCF_DIMMING_STEPS + i] &= ~(1 << bit);
-            prog->red[row * DCF_DIMMING_STEPS + i] |= (0x10000 << bit);
-        }
-        if (g > i) {
-            prog->green[row * DCF_DIMMING_STEPS + i] |= (1 << bit);
-            prog->green[row * DCF_DIMMING_STEPS + i] &= ~(0x10000 << bit);
-        } else {
-            prog->green[row * DCF_DIMMING_STEPS + i] &= ~(1 << bit);
-            prog->green[row * DCF_DIMMING_STEPS + i] |= (0x10000 << bit);
-        }
-        if (b > i) {
-            prog->blue[row * DCF_DIMMING_STEPS + i] |= (1 << bit);
-            prog->blue[row * DCF_DIMMING_STEPS + i] &= ~(0x10000 << bit);
-        } else {
-            prog->blue[row * DCF_DIMMING_STEPS + i] &= ~(1 << bit);
-            prog->blue[row * DCF_DIMMING_STEPS + i] |= (0x10000 << bit);
-        }
-#endif
+    /* Write the red channel */
+    for (i = 0; i < r; i++) {
+        prog->red[row * DCF_PWM_RED_STEPS + i] |= (1 << bit);
+        prog->red[row * DCF_PWM_RED_STEPS + i] &= ~(0x10000 << bit);
+    }
+    while (i < DCF_PWM_RED_STEPS) {
+        prog->red[row * DCF_PWM_RED_STEPS + i] &= ~(1 << bit);
+        prog->red[row * DCF_PWM_RED_STEPS + i] |= (0x10000 << bit);
+        i++;
+    }
+
+    /* Write the green channel */
+    for (i = 0; i < g; i++) {
+        prog->green[row * DCF_PWM_GREEN_STEPS + i] |= (1 << bit);
+        prog->green[row * DCF_PWM_GREEN_STEPS + i] &= ~(0x10000 << bit);
+    }
+    while (i < DCF_PWM_GREEN_STEPS) {
+        prog->green[row * DCF_PWM_GREEN_STEPS + i] &= ~(1 << bit);
+        prog->green[row * DCF_PWM_GREEN_STEPS + i] |= (0x10000 << bit);
+        i++;
+    }
+
+    /* Write the blue channel */
+    for (i = 0; i < b; i++) {
+        prog->blue[row * DCF_PWM_BLUE_STEPS + i] |= (1 << bit);
+        prog->blue[row * DCF_PWM_BLUE_STEPS + i] &= ~(0x10000 << bit);
+    }
+    while (i < DCF_PWM_BLUE_STEPS) {
+        prog->blue[row * DCF_PWM_BLUE_STEPS + i] &= ~(1 << bit);
+        prog->blue[row * DCF_PWM_BLUE_STEPS + i] |= (0x10000 << bit);
+        i++;
     }
 }
 
@@ -287,23 +286,24 @@ mp_obj_t dcfurs_clear(void)
 {
     int i;
 
-    for (i = 0; i < (DCF_DIMMING_STEPS * DCF_TOTAL_ROWS); i++) {
-        /* Clear pixeks in bank B */
+    for (i = 0; i < (DCF_PWM_RED_STEPS * DCF_TOTAL_ROWS); i++) {
         dcf_fb.pxdataB.red[i] |= DCF_PIN_COL_BANKB << 16;
         dcf_fb.pxdataB.red[i] &= ~DCF_PIN_COL_BANKB;
-        dcf_fb.pxdataB.green[i] |= DCF_PIN_COL_BANKB << 16;
-        dcf_fb.pxdataB.green[i] &= ~DCF_PIN_COL_BANKB;
-        dcf_fb.pxdataB.blue[i] |= DCF_PIN_COL_BANKB << 16;
-        dcf_fb.pxdataB.blue[i] &= ~DCF_PIN_COL_BANKB;
-
-        /* Clear pixels in bank C */
         dcf_fb.pxdataC.red[i] |= DCF_PIN_COL_BANKC << 16;
         dcf_fb.pxdataC.red[i] &= ~DCF_PIN_COL_BANKC;
+    }
+    for (i = 0; i < (DCF_PWM_GREEN_STEPS * DCF_TOTAL_ROWS); i++) {
+        dcf_fb.pxdataB.green[i] |= DCF_PIN_COL_BANKB << 16;
+        dcf_fb.pxdataB.green[i] &= ~DCF_PIN_COL_BANKB;
         dcf_fb.pxdataC.green[i] |= DCF_PIN_COL_BANKC << 16;
         dcf_fb.pxdataC.green[i] &= ~DCF_PIN_COL_BANKC;
+    }
+    for (i = 0; i < (DCF_PWM_BLUE_STEPS * DCF_TOTAL_ROWS); i++) {
+        dcf_fb.pxdataB.blue[i] |= DCF_PIN_COL_BANKB << 16;
+        dcf_fb.pxdataB.blue[i] &= ~DCF_PIN_COL_BANKB;
         dcf_fb.pxdataC.blue[i] |= DCF_PIN_COL_BANKC << 16;
         dcf_fb.pxdataC.blue[i] &= ~DCF_PIN_COL_BANKC;
     }
-    
+
     return mp_const_none;
 }

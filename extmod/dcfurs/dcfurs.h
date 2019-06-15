@@ -3,7 +3,10 @@
 #define DCFURS_H_INCLUDED
 
 #define DCF_SETUP_STEPS     3
-#define DCF_DIMMING_STEPS   8
+#define DCF_PWM_RED_STEPS   7
+#define DCF_PWM_GREEN_STEPS 7
+#define DCF_PWM_BLUE_STEPS  9
+
 #define DCF_TOTAL_COLS      18
 #define DCF_TOTAL_ROWS      7
 
