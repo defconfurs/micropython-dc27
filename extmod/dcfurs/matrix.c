@@ -148,8 +148,8 @@ static void dcfurs_setpix(int row, int col, int pix)
     struct dcf_pwm_program *prog = &dcf_fb.pxdataB;
     int bit = col;
     int r = (pix & 0xE0) >> 5;
-    int g = (pix & 0x1C) >> 2;
-    int b = (pix & 0x03) * 3;
+    int g = (pix & 0x1C) / 3;
+    int b = (pix & 0x03) << 2;
     int i;
 
     /* Some bit fiddling... */
