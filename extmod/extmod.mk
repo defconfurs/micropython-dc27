@@ -197,5 +197,6 @@ endif
 ifeq ($(MICROPY_PY_DCFURS),1)
 CFLAGS_MOD += -DMICROPY_PY_DCFURS=1
 SRC_MOD += extmod/dcfurs/module.c
+SRC_MOD += extmod/dcfurs/boop.c
 SRC_MOD += extmod/dcfurs/matrix.c
 endif
