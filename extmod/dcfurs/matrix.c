@@ -6,16 +6,14 @@
 
 #include "dcfurs.h"
 
-#define DCF_PIN_CLK         (1 << 4)
-#define DCF_PIN_RED         (1 << 12)
-#define DCF_PIN_GREEN       (1 << 13)
-#define DCF_PIN_BLUE        (1 << 3)
-#define DCF_PIN_ROW_BANKB   (DCF_PIN_RED | DCF_PIN_GREEN | DCF_PIN_BLUE)
-#define DCF_PIN_COL_BANKB   0x03E7
-#define DCF_PIN_ALL_BANKB   (DCF_PIN_ROW_BANKB | DCF_PIN_CLK | DCF_PIN_COL_BANKB)
-#define DCF_PIN_COL_BANKC   0x1FF8
-#define DCF_PIN_ROW_ENABLE  (1 << 15)
-#define DCF_PIN_ALL_BANKC   (DCF_PIN_COL_BANKC | DCF_PIN_ROW_ENABLE)
+#define DCF_PIN_ROW_CLK     (1 << 4)
+#define DCF_PIN_ROW_DATA    (1 << 12)
+#define DCF_PIN_ROW_ENABLE  (1 << 8)
+#define DCF_PIN_COL_BANKB   0x03E3
+#define DCF_PIN_COL_BANKC   0x1FFC
+#define DCF_PIN_ALL_BANKA   (DCF_PIN_ROW_ENABLE)
+#define DCF_PIN_ALL_BANKB   (DCF_PIN_ROW_CLK | DCF_PIN_ROW_DATA | DCF_PIN_COL_BANKB)
+#define DCF_PIN_ALL_BANKC   (DCF_PIN_COL_BANKC)
 
 #define DCF_BITBAND_SRAM(_addr_, _bit_) \
     ((uint32_t *)SRAM1_BB_BASE)[(((unsigned long)_addr_) - SRAM1_BASE) * 8 + (_bit_)]
@@ -64,6 +62,14 @@ mp_obj_t dcfurs_init(mp_obj_t timer)
         MP_ROM_QSTR(MP_QSTR_mode), mp_load_attr(timer, MP_QSTR_OC_TIMING)
     };
 
+    /* Prepare row enable outputs (group A) */
+    gpio.Speed = GPIO_SPEED_MEDIUM;
+    gpio.Mode = GPIO_MODE_OUTPUT_PP;
+    gpio.Pull = GPIO_NOPULL;
+    gpio.Alternate = 0;
+    gpio.Pin = DCF_PIN_ALL_BANKA;
+    HAL_GPIO_Init(GPIOA, &gpio);
+
     /* Prepare row and column driver outputs (group B) */
     gpio.Speed = GPIO_SPEED_FAST;
     gpio.Mode = GPIO_MODE_OUTPUT_PP;
@@ -71,7 +77,7 @@ mp_obj_t dcfurs_init(mp_obj_t timer)
     gpio.Alternate = 0;
     gpio.Pin = DCF_PIN_ALL_BANKB;
     HAL_GPIO_Init(GPIOB, &gpio);
-    GPIOB->BSRR = DCF_PIN_ROW_BANKB;
+    GPIOB->BSRR = DCF_PIN_COL_BANKB;
 
     /* Prepare column driver outputs (group C) */
     gpio.Speed = GPIO_SPEED_FAST;
@@ -86,27 +92,22 @@ mp_obj_t dcfurs_init(mp_obj_t timer)
     /* Kindof a bug due to the shift and latch clocks being tied together. */
     memset(&dcf_fb, 0, sizeof(dcf_fb));
     dcf_fb.pxdataC.setup[0] = (DCF_PIN_COL_BANKC << 16);
-    dcf_fb.pxdataB.setup[0] = DCF_PIN_RED | (DCF_PIN_ALL_BANKB << 16);
-    dcf_fb.pxdataB.setup[1] = DCF_PIN_CLK;               /* First Rising CLK - latch RED in */
+    dcf_fb.pxdataB.setup[0] = DCF_PIN_ROW_DATA | (DCF_PIN_ALL_BANKB << 16);
+    dcf_fb.pxdataB.setup[1] = DCF_PIN_ROW_CLK;           /* First Rising CLK - latch RED in */
     dcf_fb.pxdataB.setup[2] = (DCF_PIN_ALL_BANKB << 16); /* First Falling CLK */
 
     /* A rising edge shifts the pulse to the next row at each step. */
     for (i = 0; i < DCF_TOTAL_ROWS; i++) {
         dcf_fb.pxdataC.red[(i * DCF_PWM_RED_STEPS) + 0] = DCF_PIN_COL_BANKC << 16;
-        dcf_fb.pxdataB.red[(i * DCF_PWM_RED_STEPS) + 0] = DCF_PIN_CLK | (DCF_PIN_COL_BANKB << 16);
-        dcf_fb.pxdataB.red[(i * DCF_PWM_RED_STEPS) + 1] = (DCF_PIN_CLK << 16);
+        dcf_fb.pxdataB.red[(i * DCF_PWM_RED_STEPS) + 0] = DCF_PIN_ROW_CLK | (DCF_PIN_COL_BANKB << 16);
+        dcf_fb.pxdataB.red[(i * DCF_PWM_RED_STEPS) + 1] = (DCF_PIN_ROW_CLK << 16);
         dcf_fb.pxdataC.green[(i * DCF_PWM_GREEN_STEPS) + 0] = DCF_PIN_COL_BANKC << 16;
-        dcf_fb.pxdataB.green[(i * DCF_PWM_GREEN_STEPS) + 0] = DCF_PIN_CLK | (DCF_PIN_COL_BANKB << 16);
-        dcf_fb.pxdataB.green[(i * DCF_PWM_GREEN_STEPS) + 1] |= (DCF_PIN_CLK << 16);
+        dcf_fb.pxdataB.green[(i * DCF_PWM_GREEN_STEPS) + 0] = DCF_PIN_ROW_CLK | (DCF_PIN_COL_BANKB << 16);
+        dcf_fb.pxdataB.green[(i * DCF_PWM_GREEN_STEPS) + 1] |= (DCF_PIN_ROW_CLK << 16);
         dcf_fb.pxdataC.blue[(i * DCF_PWM_BLUE_STEPS) + 0] = DCF_PIN_COL_BANKC << 16;
-        dcf_fb.pxdataB.blue[(i * DCF_PWM_BLUE_STEPS) + 0] |= DCF_PIN_CLK | (DCF_PIN_COL_BANKB << 16);
-        dcf_fb.pxdataB.blue[(i * DCF_PWM_BLUE_STEPS) + 1] |= (DCF_PIN_CLK << 16);
+        dcf_fb.pxdataB.blue[(i * DCF_PWM_BLUE_STEPS) + 0] |= DCF_PIN_ROW_CLK | (DCF_PIN_COL_BANKB << 16);
+        dcf_fb.pxdataB.blue[(i * DCF_PWM_BLUE_STEPS) + 1] |= (DCF_PIN_ROW_CLK << 16);
     }
-    /* The last clock for the R and G channels should setup a pulse for the next color plane. */
-    dcf_fb.pxdataB.red[(DCF_TOTAL_ROWS - 1) * DCF_PWM_RED_STEPS - 1] |= DCF_PIN_GREEN;
-    dcf_fb.pxdataB.red[(DCF_TOTAL_ROWS - 1) * DCF_PWM_RED_STEPS + 1] |= (DCF_PIN_GREEN << 16);
-    dcf_fb.pxdataB.green[(DCF_TOTAL_ROWS - 1) * DCF_PWM_GREEN_STEPS - 1] |= DCF_PIN_BLUE;
-    dcf_fb.pxdataB.green[(DCF_TOTAL_ROWS - 1) * DCF_PWM_GREEN_STEPS + 1] |= (DCF_PIN_BLUE << 16);
 
     /* Initialize the DMA channels  */
     /* TODO: Sanity-check that the caller gave us the right timer (TIM8)? */
@@ -138,7 +139,7 @@ mp_obj_t dcfurs_init(mp_obj_t timer)
     htim->Instance->DIER |= (TIM_DMA_CC1 | TIM_DMA_CC2);
 
     /* Enable the matrix driver output. */
-    GPIOC->BSRR = DCF_PIN_ROW_ENABLE << 16;
+    GPIOA->BSRR = DCF_PIN_ROW_ENABLE << 16;
 
     return mp_const_none;
 }
@@ -156,7 +157,7 @@ static void dcfurs_setpix(int row, int col, int pix)
     if (col >= 13) {
         /* COL13-17 are mapped to middle bits of port B. */
         bit = col - 8;
-    } else if (col >= 3) {
+    } else if (col >= 2) {
         /* COL3-12 are mapped onto port C instead. */
         prog = &dcf_fb.pxdataC;
     }

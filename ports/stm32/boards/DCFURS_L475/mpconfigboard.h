@@ -5,6 +5,7 @@
 #define MICROPY_HW_HAS_SWITCH       (1)
 #define MICROPY_HW_HAS_FLASH        (1)
 #define MICROPY_HW_ENABLE_RNG       (1)
+#define MICROPY_HW_ENABLE_RTC       (1)
 #define MICROPY_HW_ENABLE_USB       (1)
 
 // use external SPI flash for storage
@@ -30,7 +31,7 @@ extern struct _spi_bdev_t spi_bdev;
 #define MICROPY_HW_CLK_PLLN (40)
 #define MICROPY_HW_CLK_PLLP (RCC_PLLP_DIV7)
 #define MICROPY_HW_CLK_PLLR (RCC_PLLR_DIV2)
-#define MICROPY_HW_CLK_PLLQ (RCC_PLLQ_DIV2)
+#define MICROPY_HW_CLK_PLLQ (RCC_PLLQ_DIV4)
 
 #define MICROPY_HW_FLASH_LATENCY    FLASH_LATENCY_4
 
@@ -42,9 +43,8 @@ extern struct _spi_bdev_t spi_bdev;
 #define MICROPY_HW_I2C3_SCL (pin_C0)
 #define MICROPY_HW_I2C3_SDA (pin_C1)
 
-
 // User and wake-up switch. Pressing the button makes the input go low.
-#define MICROPY_HW_USRSW_PIN        (pin_C14)
+#define MICROPY_HW_USRSW_PIN        (pin_C13)
 #define MICROPY_HW_USRSW_PULL       (GPIO_NOPULL)
 #define MICROPY_HW_USRSW_EXTI_MODE  (GPIO_MODE_IT_RISING)
 #define MICROPY_HW_USRSW_PRESSED    (1)
