@@ -8,7 +8,8 @@
 
 #include "dcfurs.h"
 
-#define DCF_PIN_TSC_CAP     (1 << 14) /* TSC_G1_IO3 */
+#define DCF_PIN_TSC_CAP     (1 << 13) /* TSC_G1_IO2 */
+#define DCF_PIN_TSC_JAWS    (1 << 14) /* TSC_G1_IO3 */
 #define DCF_PIN_TSC_BOOP    (1 << 15) /* TSC_G1_IO4 */
 
 typedef struct _dcfurs_obj_boop_t {
@@ -135,7 +136,7 @@ static mp_obj_t boop_make_new(const mp_obj_type_t *type, size_t n_args, size_t n
     gpio.Mode = GPIO_MODE_AF_PP;
     gpio.Pull = GPIO_NOPULL;
     gpio.Alternate = GPIO_AF9_TSC;
-    gpio.Pin = DCF_PIN_TSC_CAP | DCF_PIN_TSC_BOOP;
+    gpio.Pin = DCF_PIN_TSC_CAP | DCF_PIN_TSC_JAWS | DCF_PIN_TSC_BOOP;
     HAL_GPIO_Init(GPIOB, &gpio);
 
     /* Configure the TSC controller */
@@ -155,7 +156,7 @@ static mp_obj_t boop_make_new(const mp_obj_type_t *type, size_t n_args, size_t n
     self->handle.Init.MaxCountInterrupt        = DISABLE;
     self->handle.Init.ChannelIOs = (1 << 3);
     self->handle.Init.ShieldIOs  = 0;
-    self->handle.Init.SamplingIOs = (1 << 2);
+    self->handle.Init.SamplingIOs = (1 << 1);
 
     /* Find the prescaler that results in a clock less than 16MHz  */
     while (self->handle.Init.PulseGeneratorPrescaler < TSC_PG_PRESC_DIV128) {
