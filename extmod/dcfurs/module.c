@@ -8,6 +8,8 @@
 /* LED Matrix operations */
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(dcfurs_init_obj, dcfurs_init);
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(dcfurs_set_pixel_obj, dcfurs_set_pixel);
+STATIC MP_DEFINE_CONST_FUN_OBJ_3(dcfurs_set_pix_rgb_obj, dcfurs_set_pix_rgb);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dcfurs_set_pix_hue_obj, 3, 4, dcfurs_set_pix_hue);
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(dcfurs_set_row_obj, dcfurs_set_row);
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(dcfurs_set_frame_obj, dcfurs_set_frame);
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(dcfurs_has_pixel_obj, dcfurs_has_pixel);
@@ -19,6 +21,8 @@ STATIC const mp_rom_map_elem_t mp_module_dcfurs_globals_table[] = {
     /* LED Matrix API */
     { MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&dcfurs_init_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_pixel), MP_ROM_PTR(&dcfurs_set_pixel_obj) },
+    { MP_ROM_QSTR(MP_QSTR_set_pix_rgb), MP_ROM_PTR(&dcfurs_set_pix_rgb_obj) },
+    { MP_ROM_QSTR(MP_QSTR_set_pix_hue), MP_ROM_PTR(&dcfurs_set_pix_hue_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_row), MP_ROM_PTR(&dcfurs_set_row_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_frame), MP_ROM_PTR(&dcfurs_set_frame_obj) },
     { MP_ROM_QSTR(MP_QSTR_clear), MP_ROM_PTR(&dcfurs_clear_obj) },

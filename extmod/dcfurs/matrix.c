@@ -103,10 +103,10 @@ mp_obj_t dcfurs_init(mp_obj_t timer)
         dcf_fb.pxdataB.red[(i * DCF_PWM_RED_STEPS) + 1] = (DCF_PIN_ROW_CLK << 16);
         dcf_fb.pxdataC.green[(i * DCF_PWM_GREEN_STEPS) + 0] = DCF_PIN_COL_BANKC << 16;
         dcf_fb.pxdataB.green[(i * DCF_PWM_GREEN_STEPS) + 0] = DCF_PIN_ROW_CLK | (DCF_PIN_COL_BANKB << 16);
-        dcf_fb.pxdataB.green[(i * DCF_PWM_GREEN_STEPS) + 1] |= (DCF_PIN_ROW_CLK << 16);
+        dcf_fb.pxdataB.green[(i * DCF_PWM_GREEN_STEPS) + 1] = (DCF_PIN_ROW_CLK << 16);
         dcf_fb.pxdataC.blue[(i * DCF_PWM_BLUE_STEPS) + 0] = DCF_PIN_COL_BANKC << 16;
-        dcf_fb.pxdataB.blue[(i * DCF_PWM_BLUE_STEPS) + 0] |= DCF_PIN_ROW_CLK | (DCF_PIN_COL_BANKB << 16);
-        dcf_fb.pxdataB.blue[(i * DCF_PWM_BLUE_STEPS) + 1] |= (DCF_PIN_ROW_CLK << 16);
+        dcf_fb.pxdataB.blue[(i * DCF_PWM_BLUE_STEPS) + 0] = DCF_PIN_ROW_CLK | (DCF_PIN_COL_BANKB << 16);
+        dcf_fb.pxdataB.blue[(i * DCF_PWM_BLUE_STEPS) + 1] = (DCF_PIN_ROW_CLK << 16);
     }
 
     /* Initialize the DMA channels  */
@@ -144,13 +144,10 @@ mp_obj_t dcfurs_init(mp_obj_t timer)
     return mp_const_none;
 }
 
-static void dcfurs_setpix(int row, int col, int pix)
+static void dcfurs_setpix(int row, int col, int r, int g, int b)
 {
     struct dcf_pwm_program *prog = &dcf_fb.pxdataB;
     int bit = col;
-    int r = (pix & 0xE0) >> 5;
-    int g = (pix & 0x1C) / 3;
-    int b = (pix & 0x03) << 2;
     int i;
 
     /* Some bit fiddling... */
@@ -200,6 +197,7 @@ mp_obj_t dcfurs_set_pixel(mp_obj_t xobj, mp_obj_t yobj, mp_obj_t vobj)
 {
     int col = mp_obj_get_int(xobj);
     int row = mp_obj_get_int(yobj);
+    int pix = mp_obj_get_int(vobj);
 
     if ((row < 0) || (row >= DCF_TOTAL_ROWS)) {
         return mp_const_none; /* TODO: Throw a range error or something? */
@@ -208,7 +206,90 @@ mp_obj_t dcfurs_set_pixel(mp_obj_t xobj, mp_obj_t yobj, mp_obj_t vobj)
         return mp_const_none; /* TODO: Throw a range error or something? */
     }
 
-    dcfurs_setpix(row, col, mp_obj_get_int(vobj));
+    /* Bit fiddling to expand out to the number of PWM steps. */
+    int r = ((pix & 0xE0) * 6) >> 5;    /* Range of 0 to 42 */
+    int g = ((pix & 0x1C) * 29) >> 4;   /* Range of 0 to 50 */
+    int b = (pix & 0x03) * 21;          /* Range of 0 to 63 */
+
+    dcfurs_setpix(row, col, r, g, b);
+    return mp_const_none;
+}
+
+mp_obj_t dcfurs_set_pix_rgb(mp_obj_t xobj, mp_obj_t yobj, mp_obj_t rgb)
+{
+    int col = mp_obj_get_int(xobj);
+    int row = mp_obj_get_int(yobj);
+    int pix = mp_obj_get_int(rgb);
+
+    int r = ((pix & 0xFF0000) >> 16) / DCF_PWM_RED_DIVISOR;
+    int g = ((pix & 0x00FF00) >> 8) / DCF_PWM_GREEN_DIVISOR;
+    int b = ((pix & 0x0000FF) >> 0) / DCF_PWM_BLUE_DIVISOR;
+
+    if ((row < 0) || (row >= DCF_TOTAL_ROWS)) {
+        return mp_const_none; /* TODO: Throw a range error or something? */
+    }
+    if ((col < 0) || (col >= DCF_TOTAL_COLS)) {
+        return mp_const_none; /* TODO: Throw a range error or something? */
+    }
+
+    dcfurs_setpix(row, col, r, g, b);
+    return mp_const_none;
+}
+
+mp_obj_t dcfurs_set_pix_hue(size_t n_args, const mp_obj_t *args)
+{
+    /* Arguments */
+    int col = mp_obj_get_int(args[0]);
+    int row = mp_obj_get_int(args[1]);
+    int hue = mp_obj_get_int(args[2]);
+    int sextant = hue / 60;
+    int remainder = hue % 60;
+    int val = (n_args > 3) ? mp_obj_get_int(args[3]) : 255;
+    int r = 0, g = 0, b = 0;
+    int falling = (val * (60 - remainder)) / 60;
+    int rising = (val * remainder) / 60;
+
+    if ((row < 0) || (row >= DCF_TOTAL_ROWS)) {
+        return mp_const_none; /* TODO: Throw a range error or something? */
+    }
+    if ((col < 0) || (col >= DCF_TOTAL_COLS)) {
+        return mp_const_none; /* TODO: Throw a range error or something? */
+    }
+
+    /* Convert to RGB 0-255 */
+    switch (sextant) {
+        default:
+        case 0:
+            r = val;
+            g = rising;
+            break;
+        case 1:
+            r = falling;
+            g = val;
+            break;
+        case 2:
+            g = val;
+            b = rising;
+            break;
+        case 3:
+            g = falling;
+            b = val;
+            break;
+        case 4:
+            r = rising;
+            b = val;
+            break;
+        case 5:
+            r = val;
+            b = falling;
+            break;
+    }
+
+    /* Output the pixel */
+    dcfurs_setpix(row, col,
+        r / DCF_PWM_RED_DIVISOR,
+        g / DCF_PWM_GREEN_DIVISOR,
+        b / DCF_PWM_BLUE_DIVISOR);
     return mp_const_none;
 }
 
@@ -225,7 +306,11 @@ mp_obj_t dcfurs_set_row(mp_obj_t rowobj, mp_obj_t data)
         int col = 0;
         int pixels = mp_obj_get_int(data);
         for (col = 0; col < DCF_TOTAL_COLS; col++) {
-            dcfurs_setpix(rownum, col, (pixels & (1 << col)) ? 0xff : 0);
+            if (pixels & (1 << col)) {
+                dcfurs_setpix(rownum, col, DCF_PWM_RED_STEPS, DCF_PWM_GREEN_STEPS, DCF_PWM_BLUE_STEPS);
+            } else {
+                dcfurs_setpix(rownum, col, 0, 0, 0);
+            }
         }
     }
     /* If a bytearray was provided, use it as an array of 8-bit RGB pixels. */
@@ -236,7 +321,9 @@ mp_obj_t dcfurs_set_row(mp_obj_t rowobj, mp_obj_t data)
             bufinfo.len = DCF_TOTAL_COLS;
         }
         for (col = 0; col < bufinfo.len; col++) {
-            dcfurs_setpix(rownum, col, px[col]);
+            dcfurs_set_pixel(MP_OBJ_NEW_SMALL_INT(col),
+                            MP_OBJ_NEW_SMALL_INT(rownum),
+                            MP_OBJ_NEW_SMALL_INT(px[col]));
         }
     }
 
