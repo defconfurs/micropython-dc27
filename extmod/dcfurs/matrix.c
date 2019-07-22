@@ -160,6 +160,7 @@ static void dcfurs_setpix(int row, int col, int r, int g, int b)
     }
 
     /* Write the red channel */
+    if (r > DCF_PWM_RED_STEPS) r = DCF_PWM_RED_STEPS;
     for (i = 0; i < r; i++) {
         prog->red[row * DCF_PWM_RED_STEPS + i] |= (1 << bit);
         prog->red[row * DCF_PWM_RED_STEPS + i] &= ~(0x10000 << bit);
@@ -171,6 +172,7 @@ static void dcfurs_setpix(int row, int col, int r, int g, int b)
     }
 
     /* Write the green channel */
+    if (g > DCF_PWM_GREEN_STEPS) g = DCF_PWM_GREEN_STEPS;
     for (i = 0; i < g; i++) {
         prog->green[row * DCF_PWM_GREEN_STEPS + i] |= (1 << bit);
         prog->green[row * DCF_PWM_GREEN_STEPS + i] &= ~(0x10000 << bit);
@@ -182,6 +184,7 @@ static void dcfurs_setpix(int row, int col, int r, int g, int b)
     }
 
     /* Write the blue channel */
+    if (b > DCF_PWM_BLUE_STEPS) b = DCF_PWM_BLUE_STEPS;
     for (i = 0; i < b; i++) {
         prog->blue[row * DCF_PWM_BLUE_STEPS + i] |= (1 << bit);
         prog->blue[row * DCF_PWM_BLUE_STEPS + i] &= ~(0x10000 << bit);
@@ -293,9 +296,10 @@ mp_obj_t dcfurs_set_pix_hue(size_t n_args, const mp_obj_t *args)
     return mp_const_none;
 }
 
-mp_obj_t dcfurs_set_row(mp_obj_t rowobj, mp_obj_t data)
+mp_obj_t dcfurs_set_row(size_t n_args, const mp_obj_t *args)
 {
-    int rownum = mp_obj_get_int(rowobj);
+    int rownum = mp_obj_get_int(args[0]);
+    mp_obj_t data = args[1]; 
     mp_buffer_info_t bufinfo;
     if ((rownum < 0) || (rownum >= DCF_TOTAL_ROWS)) {
         return mp_const_none; /* TODO: Throw a range error or something? */
@@ -305,9 +309,21 @@ mp_obj_t dcfurs_set_row(mp_obj_t rowobj, mp_obj_t data)
     if (mp_obj_is_integer(data)) {
         int col = 0;
         int pixels = mp_obj_get_int(data);
+        int px_red = DCF_PWM_RED_STEPS;
+        int px_green = DCF_PWM_GREEN_STEPS;
+        int px_blue = DCF_PWM_BLUE_STEPS;
+
+        /* Set a color for the whole row, if provided. */
+        if (n_args > 2) {
+            int color = mp_obj_get_int(args[2]);
+            px_red = ((color & 0xFF0000) >> 16) / DCF_PWM_RED_DIVISOR;
+            px_green = ((color & 0x00FF00) >> 8) / DCF_PWM_GREEN_DIVISOR;
+            px_blue = ((color & 0x0000FF) >> 0) / DCF_PWM_BLUE_DIVISOR;
+        }
+
         for (col = 0; col < DCF_TOTAL_COLS; col++) {
             if (pixels & (1 << col)) {
-                dcfurs_setpix(rownum, col, DCF_PWM_RED_STEPS, DCF_PWM_GREEN_STEPS, DCF_PWM_BLUE_STEPS);
+                dcfurs_setpix(rownum, col, px_red, px_green, px_blue);
             } else {
                 dcfurs_setpix(rownum, col, 0, 0, 0);
             }
@@ -330,14 +346,20 @@ mp_obj_t dcfurs_set_row(mp_obj_t rowobj, mp_obj_t data)
     return mp_const_none;
 }
 
-mp_obj_t dcfurs_set_frame(mp_obj_t fbobj)
+mp_obj_t dcfurs_set_frame(size_t n_args, const mp_obj_t *args)
 {
+    mp_obj_t colorobj = (n_args < 2) ? MP_OBJ_NEW_SMALL_INT(0xffffff) : args[1];
     mp_obj_t *rowdata;
-    mp_obj_get_array_fixed_n(fbobj, DCF_TOTAL_ROWS, &rowdata);
-    int y;
-    for (y = 0; y < DCF_TOTAL_ROWS; y++) {
-        dcfurs_set_row(MP_OBJ_NEW_SMALL_INT(y), rowdata[y]);
+    int i;
+
+    mp_obj_get_array_fixed_n(args[0], DCF_TOTAL_ROWS, &rowdata);
+    for (i = 0; i < DCF_TOTAL_ROWS; i++) {
+        mp_obj_t rowargs[] = {
+            MP_OBJ_NEW_SMALL_INT(i), rowdata[i], colorobj,
+        };
+        dcfurs_set_row(3, rowargs);
     }
+
     return mp_const_none;
 }
 

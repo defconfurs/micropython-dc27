@@ -20,8 +20,8 @@ mp_obj_t dcfurs_init(mp_obj_t timer);
 mp_obj_t dcfurs_set_pixel(mp_obj_t xobj, mp_obj_t yobj, mp_obj_t vobj);
 mp_obj_t dcfurs_set_pix_rgb(mp_obj_t xobj, mp_obj_t yobj, mp_obj_t rgb);
 mp_obj_t dcfurs_set_pix_hue(size_t n_args, const mp_obj_t *args);
-mp_obj_t dcfurs_set_row(mp_obj_t yobj, mp_obj_t rowdata);
-mp_obj_t dcfurs_set_frame(mp_obj_t fbuf);
+mp_obj_t dcfurs_set_row(size_t n_args, const mp_obj_t *args);
+mp_obj_t dcfurs_set_frame(size_t n_args, const mp_obj_t *args);
 mp_obj_t dcfurs_has_pixel(mp_obj_t xobj, mp_obj_t yobj);
 mp_obj_t dcfurs_clear(void);
 

@@ -10,8 +10,8 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(dcfurs_init_obj, dcfurs_init);
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(dcfurs_set_pixel_obj, dcfurs_set_pixel);
 STATIC MP_DEFINE_CONST_FUN_OBJ_3(dcfurs_set_pix_rgb_obj, dcfurs_set_pix_rgb);
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dcfurs_set_pix_hue_obj, 3, 4, dcfurs_set_pix_hue);
-STATIC MP_DEFINE_CONST_FUN_OBJ_2(dcfurs_set_row_obj, dcfurs_set_row);
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(dcfurs_set_frame_obj, dcfurs_set_frame);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dcfurs_set_row_obj, 2, 3, dcfurs_set_row);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dcfurs_set_frame_obj, 1, 2, dcfurs_set_frame);
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(dcfurs_has_pixel_obj, dcfurs_has_pixel);
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(dcfurs_clear_obj, dcfurs_clear);
 
