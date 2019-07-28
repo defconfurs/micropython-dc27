@@ -15,6 +15,10 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dcfurs_set_frame_obj, 1, 2, dcfurs_se
 STATIC MP_DEFINE_CONST_FUN_OBJ_2(dcfurs_has_pixel_obj, dcfurs_has_pixel);
 STATIC MP_DEFINE_CONST_FUN_OBJ_0(dcfurs_clear_obj, dcfurs_clear);
 
+/* Interactive text game functions */
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(dcfurs_credits_obj, dcfurs_credits);
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(dcfurs_eula_obj, dcfurs_eula);
+
 STATIC const mp_rom_map_elem_t mp_module_dcfurs_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_dcfurs) },
 
@@ -29,6 +33,10 @@ STATIC const mp_rom_map_elem_t mp_module_dcfurs_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_has_pixel), MP_ROM_PTR(&dcfurs_has_pixel_obj) },
     { MP_ROM_QSTR(MP_QSTR_ncols), MP_ROM_INT(DCF_TOTAL_COLS) },
     { MP_ROM_QSTR(MP_QSTR_nrows), MP_ROM_INT(DCF_TOTAL_ROWS) },
+
+    /* Hidden Text Functions */
+    { MP_ROM_QSTR(MP_QSTR_credits), MP_ROM_PTR(&dcfurs_credits_obj) },
+    { MP_ROM_QSTR(MP_QSTR_eula), MP_ROM_PTR(&dcfurs_eula_obj) },
 
     /* Touch Sense/Booping */
     { MP_ROM_QSTR(MP_QSTR_boop), MP_ROM_PTR(&dcfurs_boop_type) },

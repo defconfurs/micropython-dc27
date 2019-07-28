@@ -25,6 +25,9 @@ mp_obj_t dcfurs_set_frame(size_t n_args, const mp_obj_t *args);
 mp_obj_t dcfurs_has_pixel(mp_obj_t xobj, mp_obj_t yobj);
 mp_obj_t dcfurs_clear(void);
 
+mp_obj_t dcfurs_credits(void);
+mp_obj_t dcfurs_eula(void);
+
 extern const mp_obj_type_t dcfurs_boop_type;
 
 #endif /* DCFURS_H_INCLUDED */

@@ -199,4 +199,5 @@ CFLAGS_MOD += -DMICROPY_PY_DCFURS=1
 SRC_MOD += extmod/dcfurs/module.c
 SRC_MOD += extmod/dcfurs/boop.c
 SRC_MOD += extmod/dcfurs/matrix.c
+SRC_MOD += extmod/dcfurs/pytext.c
 endif
