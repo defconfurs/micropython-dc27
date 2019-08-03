@@ -28,5 +28,5 @@ _ram_fs_cache_end = ORIGIN(FS_CACHE) + LENGTH(FS_CACHE);
 _ram_start = ORIGIN(RAM);
 _ram_end = ORIGIN(RAM) + LENGTH(RAM) + LENGTH(SRAM2);
 _heap_start = _ebss; /* heap starts just after statically allocated memory */
-_heap_end = 0x2001C000; /* tunable */
+_heap_end = ORIGIN(RAM) + LENGTH(RAM); /* tunable */
 
