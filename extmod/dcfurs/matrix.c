@@ -15,8 +15,11 @@
 #define DCF_PIN_ALL_BANKB   (DCF_PIN_ROW_CLK | DCF_PIN_ROW_DATA | DCF_PIN_COL_BANKB)
 #define DCF_PIN_ALL_BANKC   (DCF_PIN_COL_BANKC)
 
+/* Use bit-banding on the larger parts, which can put the frame buffer into main memory. */
+#if defined(STM32L496xx) || defined(STM32L4A6xx)
 #define DCF_BITBAND_SRAM(_addr_, _bit_) \
     ((uint32_t *)SRAM1_BB_BASE)[(((unsigned long)_addr_) - SRAM1_BASE) * 8 + (_bit_)]
+#endif
 
 /* PWM Program data, per GPIO bank. */
 struct dcf_pwm_program {
@@ -160,6 +163,12 @@ static void dcfurs_setpix(int row, int col, int r, int g, int b)
     }
 
     /* Write the red channel */
+#ifdef DCF_BITBAND_SRAM
+    for (i = 0; i < DCF_PWM_RED_STEPS; i++) {
+        DCF_BITBAND_SRAM(&prog->red[row * DCF_PWM_RED_STEPS + i], bit) = (i < r);
+        DCF_BITBAND_SRAM(&prog->red[row * DCF_PWM_RED_STEPS + i], bit + 16) = (i >= r);
+    }
+#else
     if (r > DCF_PWM_RED_STEPS) r = DCF_PWM_RED_STEPS;
     for (i = 0; i < r; i++) {
         prog->red[row * DCF_PWM_RED_STEPS + i] |= (1 << bit);
@@ -170,8 +179,15 @@ static void dcfurs_setpix(int row, int col, int r, int g, int b)
         prog->red[row * DCF_PWM_RED_STEPS + i] |= (0x10000 << bit);
         i++;
     }
+#endif
 
     /* Write the green channel */
+#ifdef DCF_BITBAND_SRAM
+    for (i = 0; i < DCF_PWM_GREEN_STEPS; i++) {
+        DCF_BITBAND_SRAM(&prog->green[row * DCF_PWM_GREEN_STEPS + i], bit) = (i < g);
+        DCF_BITBAND_SRAM(&prog->green[row * DCF_PWM_GREEN_STEPS + i], bit + 16) = (i >= g);
+    }
+#else
     if (g > DCF_PWM_GREEN_STEPS) g = DCF_PWM_GREEN_STEPS;
     for (i = 0; i < g; i++) {
         prog->green[row * DCF_PWM_GREEN_STEPS + i] |= (1 << bit);
@@ -182,8 +198,15 @@ static void dcfurs_setpix(int row, int col, int r, int g, int b)
         prog->green[row * DCF_PWM_GREEN_STEPS + i] |= (0x10000 << bit);
         i++;
     }
+#endif
 
     /* Write the blue channel */
+#ifdef DCF_BITBAND_SRAM
+    for (i = 0; i < DCF_PWM_BLUE_STEPS; i++) {
+        DCF_BITBAND_SRAM(&prog->blue[row * DCF_PWM_BLUE_STEPS + i], bit) = (i < b);
+        DCF_BITBAND_SRAM(&prog->blue[row * DCF_PWM_BLUE_STEPS + i], bit + 16) = (i >= b);
+    }
+#else
     if (b > DCF_PWM_BLUE_STEPS) b = DCF_PWM_BLUE_STEPS;
     for (i = 0; i < b; i++) {
         prog->blue[row * DCF_PWM_BLUE_STEPS + i] |= (1 << bit);
@@ -194,6 +217,7 @@ static void dcfurs_setpix(int row, int col, int r, int g, int b)
         prog->blue[row * DCF_PWM_BLUE_STEPS + i] |= (0x10000 << bit);
         i++;
     }
+#endif
 }
 
 mp_obj_t dcfurs_set_pixel(mp_obj_t xobj, mp_obj_t yobj, mp_obj_t vobj)
