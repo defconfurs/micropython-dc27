@@ -85,7 +85,7 @@ mp_obj_t dcfurs_credits(void)
     print_credit("Alofoxx",     "Business, logistics and software");
     print_credit("DranoTheCat", "Graphics design and interactive animations");
     print_credit("Kayfox",      "Software and logistics");
-    print_credit("Liquidthex",  "Animations and badge web animator");
+    print_credit("Liquidthex",  "Animations and the web animator tool");
     print_credit("FizzOtter",   "Electronics manufacturing and logistics");
     print_credit("Merch Minion", "Graphics, swag and printing");
     print_credit("Jippen",      "Badge challenge and puzzles");

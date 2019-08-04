@@ -18,14 +18,42 @@ typedef struct _dcfurs_obj_boop_t {
     int boopstate;
     TSC_HandleTypeDef handle;
     /* Short-term average data */
-    int sta_index;
-    uint32_t sta_sum;
-    uint32_t sta_samples[4];
+    struct {
+        int index;
+        uint32_t sum;
+        uint32_t samples[4];
+    } sta;
     /* Long-term average data */
-    int lta_index;
-    uint32_t lta_sum;
-    uint16_t lta_samples[256];
+    struct {
+        int index;
+        uint32_t sum;
+        uint16_t samples[256];
+    } lta;
 } dcfurs_obj_boop_t;
+
+/* Compute the variance over the short-term average. */
+static uint32_t
+boop_sta_variance(dcfurs_obj_boop_t *self)
+{
+    uint32_t avg = self->sta.sum / MP_ARRAY_SIZE(self->sta.samples);
+    uint32_t var = 0;
+    int i;
+
+    for (i = 0; i < MP_ARRAY_SIZE(self->sta.samples); i++) {
+        int diff = avg - self->sta.samples[i];
+        var += (diff * diff);
+    }
+    return var / MP_ARRAY_SIZE(self->sta.samples);
+}
+
+/* Calculate the boop detection threshold. */
+static uint32_t
+boop_threshold(dcfurs_obj_boop_t *self)
+{
+    uint32_t avg = self->lta.sum / MP_ARRAY_SIZE(self->lta.samples);
+    uint32_t var = boop_sta_variance(self);
+    return avg + var + 5;
+}
 
 static dcfurs_obj_boop_t dcfurs_boop_data;
 
@@ -33,19 +61,19 @@ void HAL_TSC_ConvCpltCallback(TSC_HandleTypeDef *htsc)
 {
     dcfurs_obj_boop_t *self = &dcfurs_boop_data;
     if (self) {
-        uint16_t count = 255 - HAL_TSC_GroupGetValue(&self->handle, 0);
+        int count = 255 - HAL_TSC_GroupGetValue(&self->handle, 0);
 
         /* Update the short-term average. */
-        self->sta_sum -= self->sta_samples[self->sta_index];
-        self->sta_sum += count;
-        self->sta_samples[self->sta_index++] = count;
-        if (self->sta_index >= MP_ARRAY_SIZE(self->sta_samples)) self->sta_index = 0;
+        self->sta.sum -= self->sta.samples[self->sta.index];
+        self->sta.sum += count;
+        self->sta.samples[self->sta.index++] = count;
+        if (self->sta.index >= MP_ARRAY_SIZE(self->sta.samples)) self->sta.index = 0;
 
         /* Update the long-term average. */
-        self->lta_sum -= self->lta_samples[self->lta_index];
-        self->lta_sum += count;
-        self->lta_samples[self->lta_index++] = count;
-        if (self->lta_index >= MP_ARRAY_SIZE(self->lta_samples)) self->lta_index = 0;
+        self->lta.sum -= self->lta.samples[self->lta.index];
+        self->lta.sum += count;
+        self->lta.samples[self->lta.index++] = count;
+        if (self->lta.index >= MP_ARRAY_SIZE(self->lta.samples)) self->lta.index = 0;
 
         /* Flag that there is new data to be read. */
         self->newdata = 0;
@@ -78,27 +106,33 @@ static mp_obj_t boop_value(mp_obj_t self_in)
         HAL_TSC_PollForAcquisition(&self->handle);
     }
 
-    int index = self->lta_index ? self->lta_index : MP_ARRAY_SIZE(self->lta_samples);
+    int index = self->lta.index ? self->lta.index : MP_ARRAY_SIZE(self->lta.samples);
     self->newdata = 0;
-    return mp_obj_new_int(self->lta_samples[index-1]);
+    return mp_obj_new_int(self->lta.samples[index-1]);
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(boop_value_obj, boop_value);
 
 static mp_obj_t boop_average(mp_obj_t self_in)
 {
     dcfurs_obj_boop_t *self = MP_OBJ_TO_PTR(self_in);
+#if 0
     return mp_obj_new_int(self->lta_sum / MP_ARRAY_SIZE(self->lta_samples));
+#else
+    mp_obj_t ret = mp_obj_new_tuple(3, NULL);
+    mp_obj_tuple_t *tuple = MP_OBJ_TO_PTR(ret);
+    tuple->items[0] = mp_obj_new_int(self->lta.sum / MP_ARRAY_SIZE(self->lta.samples));
+    tuple->items[1] = mp_obj_new_int(self->sta.sum / MP_ARRAY_SIZE(self->sta.samples));
+    tuple->items[2] = mp_obj_new_int(boop_sta_variance(self));
+    return ret;
+#endif
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(boop_average_obj, boop_average);
 
 static mp_obj_t boop_event(mp_obj_t self_in)
 {
     dcfurs_obj_boop_t *self = MP_OBJ_TO_PTR(self_in);
-
-    /* Define 'touched' if short-term average is greater that twice the long-term average. */
-    uint32_t threshold = (self->lta_sum * 2) / MP_ARRAY_SIZE(self->lta_samples);
-    uint32_t measured = self->sta_sum / MP_ARRAY_SIZE(self->sta_samples);
-    int delta = measured - threshold;
+    uint32_t measured = self->sta.sum / MP_ARRAY_SIZE(self->sta.samples);
+    int delta = measured - boop_threshold(self);
 
     /* If we have been booped, return false until not touched. */
     if (self->boopstate) {
@@ -124,11 +158,21 @@ static mp_obj_t boop_make_new(const mp_obj_type_t *type, size_t n_args, size_t n
 {
     dcfurs_obj_boop_t *self = &dcfurs_boop_data;
     uint32_t hclk_freq = HAL_RCC_GetHCLKFreq();
+    int channel = 0;
+
+    /* Which channel should we sense? */
+    if (n_args > 0) {
+        channel = mp_obj_get_int(args[0]);
+    }
 
     memset(&self->base, 0, sizeof(mp_obj_base_t));
     self->base.type = &dcfurs_boop_type;
     self->newdata = 0;
     self->boopstate = 0;
+
+    /* Initialize the boxcar averages. */
+    memset(&self->sta, 0, sizeof(self->sta));
+    memset(&self->lta, 0, sizeof(self->lta));
 
     /* Configure the TSC GPIO pins */
     GPIO_InitTypeDef gpio;
@@ -154,7 +198,7 @@ static mp_obj_t boop_make_new(const mp_obj_type_t *type, size_t n_args, size_t n
     self->handle.Init.SynchroPinPolarity       = TSC_SYNC_POLARITY_FALLING;
     self->handle.Init.AcquisitionMode          = TSC_ACQ_MODE_NORMAL;
     self->handle.Init.MaxCountInterrupt        = DISABLE;
-    self->handle.Init.ChannelIOs = (1 << 3);
+    self->handle.Init.ChannelIOs = channel ? (1 << 2) : (1 << 3);
     self->handle.Init.ShieldIOs  = 0;
     self->handle.Init.SamplingIOs = (1 << 1);
 
