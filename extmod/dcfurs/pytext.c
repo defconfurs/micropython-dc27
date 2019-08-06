@@ -85,11 +85,14 @@ mp_obj_t dcfurs_credits(void)
     print_credit("Alofoxx",     "Business, logistics and software");
     print_credit("DranoTheCat", "Graphics design and interactive animations");
     print_credit("Kayfox",      "Software and logistics");
+    print_credit("LoialOtter",  "Badge assembly and logistics");
     print_credit("Liquidthex",  "Animations and the web animator tool");
     print_credit("FizzOtter",   "Electronics manufacturing and logistics");
+    print_credit("Fujimaru",    "Badge assembly and logistics");
     print_credit("Merch Minion", "Graphics, swag and printing");
     print_credit("Jippen",      "Badge challenge and puzzles");
     print_credit("redyoshi49q", "Badge challenge and puzzles");
+    print_credit("Colefox",     "Badge assembly and logistics");
 
     printf("\nStay fuzzy, and happy hacking!\n\n");
     return mp_const_none;

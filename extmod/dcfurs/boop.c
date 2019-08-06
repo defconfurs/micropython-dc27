@@ -16,6 +16,7 @@ typedef struct _dcfurs_obj_boop_t {
     mp_obj_base_t base;
     int newdata;
     int boopstate;
+    int cooldown;
     TSC_HandleTypeDef handle;
     /* Short-term average data */
     struct {
@@ -52,7 +53,7 @@ boop_threshold(dcfurs_obj_boop_t *self)
 {
     uint32_t avg = self->lta.sum / MP_ARRAY_SIZE(self->lta.samples);
     uint32_t var = boop_sta_variance(self);
-    return avg + var + 5;
+    return avg + var + 3;
 }
 
 static dcfurs_obj_boop_t dcfurs_boop_data;
@@ -67,13 +68,18 @@ void HAL_TSC_ConvCpltCallback(TSC_HandleTypeDef *htsc)
         self->sta.sum -= self->sta.samples[self->sta.index];
         self->sta.sum += count;
         self->sta.samples[self->sta.index++] = count;
-        if (self->sta.index >= MP_ARRAY_SIZE(self->sta.samples)) self->sta.index = 0;
+        if (self->sta.index >= MP_ARRAY_SIZE(self->sta.samples)) {
+            self->sta.index = 0;
+        }
 
         /* Update the long-term average. */
         self->lta.sum -= self->lta.samples[self->lta.index];
         self->lta.sum += count;
         self->lta.samples[self->lta.index++] = count;
-        if (self->lta.index >= MP_ARRAY_SIZE(self->lta.samples)) self->lta.index = 0;
+        if (self->lta.index >= MP_ARRAY_SIZE(self->lta.samples)) {
+            self->lta.index = 0;
+            self->cooldown = 0;
+        }
 
         /* Flag that there is new data to be read. */
         self->newdata = 0;
@@ -169,6 +175,8 @@ static mp_obj_t boop_make_new(const mp_obj_type_t *type, size_t n_args, size_t n
     self->base.type = &dcfurs_boop_type;
     self->newdata = 0;
     self->boopstate = 0;
+    /* Disable event reporting until the LTA has stabilized. */
+    self->cooldown = 1;
 
     /* Initialize the boxcar averages. */
     memset(&self->sta, 0, sizeof(self->sta));
