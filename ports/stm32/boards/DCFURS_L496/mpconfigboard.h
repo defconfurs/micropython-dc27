@@ -15,6 +15,11 @@
 #define MICROPY_HW_SPIFLASH_MISO    (pin_A6)
 #define MICROPY_HW_SPIFLASH_MOSI    (pin_A7)
 
+#define MICROPY_HW_SPI1_NSS         (pin_A4)
+#define MICROPY_HW_SPI1_SCK         (pin_A5)
+#define MICROPY_HW_SPI1_MISO        (pin_A6)
+#define MICROPY_HW_SPI1_MOSI        (pin_A7)
+
 // block device config for SPI flash
 extern const struct _mp_spiflash_config_t spiflash_config;
 extern struct _spi_bdev_t spi_bdev;
